@@ -22,22 +22,30 @@ const googleTranslate = async (text, from, to) => {
 }
 
 // Youdao unofficial — works in mainland China, Electron only (no CORS restriction)
-const youdaoTranslate = async (text, from, to) => {
+const youdaoTranslate = async (text) => {
   if (!import.meta.env.VITE_IS_ELECTRON) return null
-  try {
-    const type = (from === 'zh-CN' ? 'ZH_CN2' : `${from.toUpperCase()}2`) + (to === 'zh-CN' ? 'ZH_CN' : to.toUpperCase())
-    const url = `https://dict.youdao.com/translate?q=${encodeURIComponent(text)}&doctype=json&type=${type}&xmlVersion=5.1&keyfrom=fanyi.web&ue=UTF-8`
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(8000),
-      headers: { Referer: 'https://www.youdao.com/' },
-    })
-    if (!res.ok) return null
-    const data = await res.json()
-    if (data.errorCode !== 0 || !data.translateResult?.[0]?.[0]?.tgt) return null
-    return data.translateResult.flat().map(x => x.tgt).join('').trim() || null
-  } catch {
-    return null
+  const encoded = encodeURIComponent(text)
+  const endpoints = [
+    `https://fanyi.youdao.com/translate?i=${encoded}&doctype=json&type=AUTO&xmlVersion=5.1&keyfrom=fanyi.web&ue=UTF-8`,
+    `https://dict.youdao.com/translate?q=${encoded}&doctype=json&type=AUTO&xmlVersion=5.1&keyfrom=fanyi.web&ue=UTF-8`,
+  ]
+  for (const url of endpoints) {
+    try {
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(8000),
+        headers: { Referer: 'https://fanyi.youdao.com/' },
+      })
+      if (!res.ok) continue
+      const data = await res.json()
+      // Use loose equality: errorCode may be number 0 or string "0"
+      if (data.errorCode != 0 || !data.translateResult?.[0]?.[0]?.tgt) continue
+      const result = data.translateResult.flat().map(x => x.tgt).join('').trim()
+      if (result) return result
+    } catch {
+      continue
+    }
   }
+  return null
 }
 
 export const translateToEnglish = async (text) => {
@@ -45,7 +53,7 @@ export const translateToEnglish = async (text) => {
   try {
     const result = await googleTranslate(text, 'zh-CN', 'en')
     if (result) return result
-    const fallback = await youdaoTranslate(text, 'zh-CN', 'en')
+    const fallback = await youdaoTranslate(text)
     return fallback || text
   } catch {
     return text
@@ -62,7 +70,7 @@ export const translateToChineseFree = async (text) => {
   if (google && hasChineseContent(google)) return google
 
   // Fallback: Youdao (works in China)
-  const youdao = await youdaoTranslate(trimmed, 'en', 'zh-CN')
+  const youdao = await youdaoTranslate(trimmed)
   if (youdao && hasChineseContent(youdao)) return youdao
 
   return null
