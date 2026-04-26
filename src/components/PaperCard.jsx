@@ -19,7 +19,6 @@ export default function PaperCard({ paper, searchKeyword = '', source = 'search'
   const { currentUser } = useApp()
   const [expanded, setExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [cnTitle, setCnTitle] = useState(paper.cnTitle || null)
   const [summary, setSummary] = useState(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [summaryError, setSummaryError] = useState(false)
@@ -31,9 +30,8 @@ export default function PaperCard({ paper, searchKeyword = '', source = 'search'
     try {
       const users = (await getStore('users')) || {}
       const claudeApiKey = users[currentUser]?.claudeApiKey || null
-      const result = await getChineseSummary(paper, claudeApiKey, currentUser)
-      if (result?.cnTitle) setCnTitle(result.cnTitle)
-      setSummary(result?.summary || '暂时无法获取摘要，请稍后重试。')
+      const text = await getChineseSummary(paper, claudeApiKey, currentUser)
+      setSummary(text || '暂时无法获取摘要，请稍后重试。')
     } catch {
       setSummaryError(true)
     } finally {
@@ -76,7 +74,6 @@ export default function PaperCard({ paper, searchKeyword = '', source = 'search'
         <span className="paper-date">{formatDate(paper.date)}</span>
       </div>
 
-      {/* Bilingual title: Chinese + English */}
       <div
         className="paper-title"
         onClick={handleOpen}
@@ -84,17 +81,14 @@ export default function PaperCard({ paper, searchKeyword = '', source = 'search'
         tabIndex={0}
         onKeyDown={e => e.key === 'Enter' && handleOpen()}
       >
-        {cnTitle ? (
-          <span className="title-cn">{cnTitle}</span>
-        ) : summaryLoading ? (
-          <span className="title-cn title-loading">翻译中...</span>
-        ) : null}
+        {paper.cnTitle && (
+          <span className="title-cn">{paper.cnTitle}</span>
+        )}
         <span className="title-en">{paper.title}</span>
       </div>
 
       <div className="paper-authors">{formatAuthors(paper.authors)}</div>
 
-      {/* English abstract (collapsible) */}
       {paper.summary && (
         <div className="paper-abstract">
           <p className={`abstract-text ${expanded ? '' : 'collapsed'}`}>
@@ -106,11 +100,10 @@ export default function PaperCard({ paper, searchKeyword = '', source = 'search'
         </div>
       )}
 
-      {/* Chinese highlights/summary — displayed below abstract */}
       <div className="chinese-summary-section">
         {autoSummary && !summary && !summaryLoading && !summaryError && (
           <button className="btn-chinese-summary" onClick={fetchSummary}>
-            ✨ 查看中文亮点解读
+            ✨ 查看中文解读
           </button>
         )}
         {summaryLoading && (
@@ -124,11 +117,13 @@ export default function PaperCard({ paper, searchKeyword = '', source = 'search'
           </button>
         )}
         {summary && (
-          <div className={`chinese-summary-content ${isMachineTranslation ? 'machine-translated' : 'ai-generated'}`}>
+          <div className={`chinese-summary-content ${isMachineTranslation ? 'machine-translated' : ''}`}>
             <span className="summary-label">
               {isMachineTranslation ? '📝 摘要翻译' : '✨ AI 亮点解读'}
             </span>
-            <p className="summary-text">{isMachineTranslation ? summary.replace('[机器翻译] ', '') : summary}</p>
+            <p className="summary-text">
+              {isMachineTranslation ? summary.replace('[机器翻译] ', '') : summary}
+            </p>
           </div>
         )}
       </div>

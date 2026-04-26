@@ -1,4 +1,4 @@
-import { translateToEnglish } from './translateService'
+import { translateToEnglish, translateToChineseFree } from './translateService'
 
 const parseArxivXML = (xmlText) => {
   const parser = new DOMParser()
@@ -41,6 +41,17 @@ const ARXIV_BASE = import.meta.env.VITE_IS_ELECTRON
   ? 'https://export.arxiv.org/api/query'
   : '/.netlify/functions/arxiv'
 
+const translateTitles = async (papers) => {
+  await Promise.all(papers.map(async (paper) => {
+    try {
+      const cn = await translateToChineseFree(paper.title)
+      paper.cnTitle = cn || null
+    } catch {
+      paper.cnTitle = null
+    }
+  }))
+}
+
 export const searchByCategory = async (category) => {
   const url =
     `${ARXIV_BASE}` +
@@ -52,24 +63,23 @@ export const searchByCategory = async (category) => {
   if (!res.ok) throw new Error(`arXiv API 返回错误: ${res.status}`)
 
   const text = await res.text()
-  return parseArxivXML(text)
+  const papers = parseArxivXML(text)
+  await translateTitles(papers)
+  return papers
 }
 
 export const searchArxiv = async (keyword, type = 'all') => {
   let query = ''
 
   if (type === 'author') {
-    // 作者搜索：使用 au: 引号包裹作者名，支持中文
     const authorName = keyword.trim()
     if (/[一-龥]/.test(authorName)) {
-      // 中文名先翻译
       const nameEn = await translateToEnglish(authorName)
       query = `au:"${nameEn.replace(/\s+/g, ' ')}"`
     } else {
       query = `au:"${authorName.replace(/\s+/g, ' ')}"`
     }
   } else if (type === 'title') {
-    // 标题搜索：使用 ti:，支持中文
     let titleKey = keyword.trim()
     if (/[一-龥]/.test(titleKey)) {
       titleKey = await translateToEnglish(titleKey)
@@ -77,7 +87,6 @@ export const searchArxiv = async (keyword, type = 'all') => {
     const terms = titleKey.trim().split(/\s+/).filter(Boolean)
     query = `ti:${terms.map(t => encodeURIComponent(t)).join('+')}`
   } else {
-    // 关键词搜索
     const keywordEn = await translateToEnglish(keyword.trim())
     const terms = keywordEn.trim().split(/\s+/).filter(Boolean)
     query = `all:${terms.map(t => encodeURIComponent(t)).join('+')}`
@@ -95,5 +104,7 @@ export const searchArxiv = async (keyword, type = 'all') => {
   const text = await res.text()
   const papers = parseArxivXML(text)
   if (papers.length === 0) throw new Error('NO_RESULTS')
+
+  await translateTitles(papers)
   return papers
 }
