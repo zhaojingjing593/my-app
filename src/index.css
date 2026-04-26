@@ -190,6 +190,22 @@ body {
   max-width: 700px;
 }
 
+.search-type-select {
+  padding: 9px 12px;
+  border: 1.5px solid var(--color-border);
+  border-radius: 24px;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  background: var(--color-bg);
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.search-type-select:focus {
+  border-color: var(--color-accent);
+}
+
 .search-input {
   flex: 1;
   padding: 9px 16px;
@@ -395,6 +411,24 @@ body {
 
 .paper-title:hover {
   color: var(--color-accent);
+}
+
+.title-cn {
+  display: block;
+  color: var(--color-accent);
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.title-loading {
+  opacity: 0.5;
+  font-style: italic;
+}
+
+.title-en {
+  display: block;
+  font-size: 1.05rem;
 }
 
 .paper-authors {
@@ -746,6 +780,11 @@ body {
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   padding: 12px 14px;
   margin-top: 6px;
+}
+
+.chinese-summary-content.machine-translated {
+  border-left-color: var(--color-border);
+  opacity: 0.85;
 }
 
 .summary-label {

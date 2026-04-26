@@ -6,6 +6,11 @@ import { searchArxiv } from '../services/arxivService'
 import { getOrFetchRecommendations } from '../services/recommendationService'
 
 const SUGGESTIONS = ['machine learning', 'quantum computing', 'large language model', 'computer vision', 'diffusion model']
+const SEARCH_TYPES = [
+  { value: 'all', label: '关键词' },
+  { value: 'author', label: '作者' },
+  { value: 'title', label: '标题' },
+]
 
 const todayLabel = () => {
   const d = new Date()
@@ -15,6 +20,7 @@ const todayLabel = () => {
 export default function SearchPage() {
   const { currentUser, searchHistory, addToHistory } = useApp()
   const [keyword, setKeyword] = useState('')
+  const [searchType, setSearchType] = useState('all')
   const [status, setStatus] = useState('idle')
   const [papers, setPapers] = useState([])
   const [searchedKeyword, setSearchedKeyword] = useState('')
@@ -31,13 +37,13 @@ export default function SearchPage() {
       .finally(() => setRecsLoading(false))
   }, [currentUser])
 
-  const doSearch = async (kw) => {
+  const doSearch = async (kw, type = searchType) => {
     const trimmed = kw.trim()
     if (!trimmed) return
     setStatus('loading')
     setSearchedKeyword(trimmed)
     try {
-      const results = await searchArxiv(trimmed)
+      const results = await searchArxiv(trimmed, type)
       setPapers(results)
       setStatus('results')
       addToHistory(trimmed)
@@ -58,7 +64,16 @@ export default function SearchPage() {
 
   const handleSuggestion = (kw) => {
     setKeyword(kw)
-    doSearch(kw)
+    setSearchType('all')
+    doSearch(kw, 'all')
+  }
+
+  const getPlaceholder = () => {
+    switch (searchType) {
+      case 'author': return '输入作者姓名（如：Hinton）'
+      case 'title': return '输入标题关键词'
+      default: return '输入关键词搜索论文（支持中英文）'
+    }
   }
 
   return (
@@ -66,11 +81,21 @@ export default function SearchPage() {
       <header className="search-header">
         <span className="header-title">📄 arXiv 推荐</span>
         <form className="search-form" onSubmit={handleSubmit}>
+          <select
+            className="search-type-select"
+            value={searchType}
+            onChange={e => setSearchType(e.target.value)}
+            disabled={status === 'loading'}
+          >
+            {SEARCH_TYPES.map(t => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
           <input
             ref={inputRef}
             className="search-input"
             type="text"
-            placeholder="输入关键词搜索论文（支持中英文）"
+            placeholder={getPlaceholder()}
             value={keyword}
             onChange={e => setKeyword(e.target.value)}
             disabled={status === 'loading'}
@@ -143,7 +168,7 @@ export default function SearchPage() {
         {status === 'loading' && (
           <div className="loading-area">
             <div className="spinner" />
-            <p>正在搜索并翻译关键词...</p>
+            <p>正在搜索并翻译...</p>
           </div>
         )}
 
@@ -170,7 +195,7 @@ export default function SearchPage() {
           <>
             <div className="results-header">
               <h3>
-                关键词 <span className="results-keyword">"{searchedKeyword}"</span> 的最新 {papers.length} 篇论文
+                {SEARCH_TYPES.find(t => t.value === searchType)?.label} <span className="results-keyword">"{searchedKeyword}"</span> 的最新 {papers.length} 篇论文
               </h3>
               <button className="btn-back-rec" onClick={() => setStatus('idle')}>
                 ← 返回今日推荐
@@ -183,7 +208,7 @@ export default function SearchPage() {
                   paper={paper}
                   searchKeyword={searchedKeyword}
                   source="search"
-                  autoSummary={false}
+                  autoSummary={true}
                 />
               ))}
             </div>
@@ -196,8 +221,9 @@ export default function SearchPage() {
           onClose={() => setShowSettings(false)}
           onSelectHistory={(kw) => {
             setKeyword(kw)
+            setSearchType('all')
             setShowSettings(false)
-            doSearch(kw)
+            doSearch(kw, 'all')
           }}
         />
       )}

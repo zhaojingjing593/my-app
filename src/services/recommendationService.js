@@ -63,14 +63,15 @@ export const getOrFetchRecommendations = async (email) => {
   return papers
 }
 
+// Returns { cnTitle, summary } — cnTitle is Chinese translation of title, summary is highlights in Chinese
 export const getChineseSummary = async (paper, claudeApiKey, email) => {
   const users = (await getStore('users')) || {}
   const user = users[email] || {}
-  const cache = user.summaryCache || {}
+  const cache = user.aiCache || {}
 
   if (cache[paper.arxivId]) return cache[paper.arxivId]
 
-  let summary = null
+  let result = { cnTitle: null, summary: null }
 
   if (claudeApiKey) {
     try {
@@ -84,33 +85,71 @@ export const getChineseSummary = async (paper, claudeApiKey, email) => {
         },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 400,
+          max_tokens: 600,
           messages: [{
             role: 'user',
-            content: `请用中文（100-150字）简要介绍这篇论文的核心贡献和亮点，可以涵盖：主要方法、关键结果、研究意义等，直接给出内容，不要加标题或前缀。\n\n标题：${paper.title}\n摘要：${paper.summary.slice(0, 800)}`,
+            content: `请分析这篇论文，以JSON格式返回（只返回JSON，不含其他文字）：
+{
+  "cnTitle": "论文标题的准确中文翻译",
+  "summary": "用中文150-200字介绍：①核心问题与方法 ②主要贡献与创新点 ③关键结果或应用价值"
+}
+
+标题：${paper.title}
+摘要：${paper.summary.slice(0, 1000)}`,
           }],
         }),
-        signal: AbortSignal.timeout(20000),
+        signal: AbortSignal.timeout(30000),
       })
       if (res.ok) {
         const data = await res.json()
-        summary = data.content?.[0]?.text || null
+        const text = data.content?.[0]?.text?.trim()
+        if (text) {
+          try {
+            const jsonStart = text.indexOf('{')
+            const jsonEnd = text.lastIndexOf('}')
+            const parsed = JSON.parse(jsonStart >= 0 ? text.slice(jsonStart, jsonEnd + 1) : text)
+            if (parsed.cnTitle || parsed.summary) {
+              result = { cnTitle: parsed.cnTitle || null, summary: parsed.summary || null }
+            }
+          } catch {
+            result = { cnTitle: null, summary: text }
+          }
+        }
       }
-    } catch { summary = null }
-  }
-
-  if (!summary) {
-    summary = await translateToChineseFree(paper.summary)
-    if (summary) summary = `[机器翻译] ${summary}`
-  }
-
-  if (summary) {
-    users[email] = {
-      ...user,
-      summaryCache: { ...cache, [paper.arxivId]: summary },
+    } catch (err) {
+      console.warn('Claude API failed:', err.message)
     }
-    await setStore('users', users)
   }
 
-  return summary
+  // Fallback for title (null means translation failed, don't show English twice)
+  if (!result.cnTitle) {
+    try {
+      result.cnTitle = await translateToChineseFree(paper.title) || null
+    } catch {
+      result.cnTitle = null
+    }
+  }
+
+  // Fallback for summary (limit to 400 chars for reliability)
+  if (!result.summary) {
+    try {
+      const shortAbstract = paper.summary.trim().slice(0, 400)
+      const translated = await translateToChineseFree(shortAbstract)
+      result.summary = translated
+        ? `[机器翻译] ${translated}`
+        : '摘要翻译暂时不可用，请在设置中配置 Claude API Key 以获取 AI 解读。'
+    } catch {
+      result.summary = '摘要翻译暂时不可用，请在设置中配置 Claude API Key 以获取 AI 解读。'
+    }
+  }
+
+  const freshUsers = (await getStore('users')) || {}
+  const freshUser = freshUsers[email] || {}
+  freshUsers[email] = {
+    ...freshUser,
+    aiCache: { ...(freshUser.aiCache || {}), [paper.arxivId]: result },
+  }
+  await setStore('users', freshUsers)
+
+  return result
 }

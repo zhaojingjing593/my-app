@@ -1,7 +1,9 @@
 exports.handler = async (event) => {
   const qs = event.rawQuery ? `?${event.rawQuery}` : ''
   try {
-    const res = await fetch(`https://api.mymemory.translated.net/get${qs}`)
+    const res = await fetch(`https://translate.googleapis.com/translate_a/single${qs}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+    })
     const data = await res.json()
     return {
       statusCode: 200,

@@ -15,10 +15,11 @@ const formatDate = (dateStr) => {
   return `${year}/${month}/${day}`
 }
 
-export default function PaperCard({ paper, searchKeyword = '', source = 'search', autoSummary = false }) {
+export default function PaperCard({ paper, searchKeyword = '', source = 'search', autoSummary = true }) {
   const { currentUser } = useApp()
   const [expanded, setExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [cnTitle, setCnTitle] = useState(paper.cnTitle || null)
   const [summary, setSummary] = useState(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [summaryError, setSummaryError] = useState(false)
@@ -30,8 +31,9 @@ export default function PaperCard({ paper, searchKeyword = '', source = 'search'
     try {
       const users = (await getStore('users')) || {}
       const claudeApiKey = users[currentUser]?.claudeApiKey || null
-      const text = await getChineseSummary(paper, claudeApiKey, currentUser)
-      setSummary(text || '暂时无法获取摘要，请稍后重试。')
+      const result = await getChineseSummary(paper, claudeApiKey, currentUser)
+      if (result?.cnTitle) setCnTitle(result.cnTitle)
+      setSummary(result?.summary || '暂时无法获取摘要，请稍后重试。')
     } catch {
       setSummaryError(true)
     } finally {
@@ -63,6 +65,8 @@ export default function PaperCard({ paper, searchKeyword = '', source = 'search'
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const isMachineTranslation = summary?.startsWith('[机器翻译]')
+
   return (
     <div className="paper-card">
       <div className="paper-meta">
@@ -72,6 +76,7 @@ export default function PaperCard({ paper, searchKeyword = '', source = 'search'
         <span className="paper-date">{formatDate(paper.date)}</span>
       </div>
 
+      {/* Bilingual title: Chinese + English */}
       <div
         className="paper-title"
         onClick={handleOpen}
@@ -79,27 +84,33 @@ export default function PaperCard({ paper, searchKeyword = '', source = 'search'
         tabIndex={0}
         onKeyDown={e => e.key === 'Enter' && handleOpen()}
       >
-        {paper.title}
+        {cnTitle ? (
+          <span className="title-cn">{cnTitle}</span>
+        ) : summaryLoading ? (
+          <span className="title-cn title-loading">翻译中...</span>
+        ) : null}
+        <span className="title-en">{paper.title}</span>
       </div>
 
       <div className="paper-authors">{formatAuthors(paper.authors)}</div>
 
+      {/* English abstract (collapsible) */}
       {paper.summary && (
         <div className="paper-abstract">
           <p className={`abstract-text ${expanded ? '' : 'collapsed'}`}>
             {paper.summary}
           </p>
           <button className="btn-expand" onClick={() => setExpanded(!expanded)}>
-            {expanded ? '收起 ▲' : '展开英文摘要 ▼'}
+            {expanded ? '收起英文摘要 ▲' : '展开英文摘要 ▼'}
           </button>
         </div>
       )}
 
-      {/* Chinese summary section */}
+      {/* Chinese highlights/summary — displayed below abstract */}
       <div className="chinese-summary-section">
-        {!summary && !summaryLoading && !summaryError && (
+        {autoSummary && !summary && !summaryLoading && !summaryError && (
           <button className="btn-chinese-summary" onClick={fetchSummary}>
-            📝 查看中文解读
+            ✨ 查看中文亮点解读
           </button>
         )}
         {summaryLoading && (
@@ -113,9 +124,11 @@ export default function PaperCard({ paper, searchKeyword = '', source = 'search'
           </button>
         )}
         {summary && (
-          <div className="chinese-summary-content">
-            <span className="summary-label">📝 中文解读</span>
-            <p className="summary-text">{summary}</p>
+          <div className={`chinese-summary-content ${isMachineTranslation ? 'machine-translated' : 'ai-generated'}`}>
+            <span className="summary-label">
+              {isMachineTranslation ? '📝 摘要翻译' : '✨ AI 亮点解读'}
+            </span>
+            <p className="summary-text">{isMachineTranslation ? summary.replace('[机器翻译] ', '') : summary}</p>
           </div>
         )}
       </div>

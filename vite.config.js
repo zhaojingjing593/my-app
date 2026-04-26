@@ -18,9 +18,9 @@ export default defineConfig(({ mode }) => ({
         rewrite: (path) => path.replace('/.netlify/functions/arxiv', '/api/query'),
       },
       '/.netlify/functions/translate': {
-        target: 'https://api.mymemory.translated.net',
+        target: 'https://translate.googleapis.com',
         changeOrigin: true,
-        rewrite: (path) => path.replace('/.netlify/functions/translate', '/get'),
+        rewrite: (path) => path.replace('/.netlify/functions/translate', '/translate_a/single'),
       },
     },
   },

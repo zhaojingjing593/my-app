@@ -55,14 +55,37 @@ export const searchByCategory = async (category) => {
   return parseArxivXML(text)
 }
 
-export const searchArxiv = async (keyword) => {
-  const englishKeyword = await translateToEnglish(keyword.trim())
-  const terms = englishKeyword.trim().split(/\s+/).filter(Boolean)
-  const query = terms.map(t => encodeURIComponent(t)).join('+AND+')
+export const searchArxiv = async (keyword, type = 'all') => {
+  let query = ''
+
+  if (type === 'author') {
+    // 作者搜索：使用 au: 引号包裹作者名，支持中文
+    const authorName = keyword.trim()
+    if (/[一-龥]/.test(authorName)) {
+      // 中文名先翻译
+      const nameEn = await translateToEnglish(authorName)
+      query = `au:"${nameEn.replace(/\s+/g, ' ')}"`
+    } else {
+      query = `au:"${authorName.replace(/\s+/g, ' ')}"`
+    }
+  } else if (type === 'title') {
+    // 标题搜索：使用 ti:，支持中文
+    let titleKey = keyword.trim()
+    if (/[一-龥]/.test(titleKey)) {
+      titleKey = await translateToEnglish(titleKey)
+    }
+    const terms = titleKey.trim().split(/\s+/).filter(Boolean)
+    query = `ti:${terms.map(t => encodeURIComponent(t)).join('+')}`
+  } else {
+    // 关键词搜索
+    const keywordEn = await translateToEnglish(keyword.trim())
+    const terms = keywordEn.trim().split(/\s+/).filter(Boolean)
+    query = `all:${terms.map(t => encodeURIComponent(t)).join('+')}`
+  }
 
   const url =
     `${ARXIV_BASE}` +
-    `?search_query=all:${query}` +
+    `?search_query=${encodeURIComponent(query)}` +
     `&start=0&max_results=5` +
     `&sortBy=submittedDate&sortOrder=descending`
 
