@@ -1,0 +1,67 @@
+{
+  "name": "arxiv-recommender",
+  "version": "1.0.0",
+  "description": "arXiv论文推荐工具 - 搜索相关领域最新论文",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build:web": "vite build --mode web",
+    "build:electron": "vite build --mode electron",
+    "electron:dev": "concurrently -k \"vite\" \"node electron/start-dev.js\"",
+    "electron:build": "npm run build:electron && electron-builder",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "electron-store": "^8.1.0",
+    "rcedit": "^5.0.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "concurrently": "^8.2.2",
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.21.0",
+    "vite": "^5.0.8"
+  },
+  "build": {
+    "appId": "com.arxivrecommender.app",
+    "productName": "arXiv论文推荐",
+    "copyright": "Copyright © 2024",
+    "directories": {
+      "output": "dist/electron-build"
+    },
+    "files": [
+      "dist/renderer/**/*",
+      "electron/**/*",
+      "!electron/start-dev.js",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "portable": {
+      "artifactName": "arXiv论文推荐-portable.exe"
+    }
+  }
+}
