@@ -34,8 +34,15 @@ const DAYS_OPTIONS = [
   { value: 30, label: '最近30天' },
 ]
 
+const FONT_SIZE_OPTIONS = [
+  { value: 'small', label: '小' },
+  { value: 'medium', label: '中' },
+  { value: 'large', label: '大' },
+  { value: 'xlarge', label: '特大' },
+]
+
 export default function SettingsPage({ onClose, onRefresh, onSearchHistoryClick }) {
-  const { currentUser, logout, themeColor, updateTheme, searchHistory, removeFromHistory } = useApp()
+  const { currentUser, logout, themeColor, updateTheme, fontSize, updateFontSize, fontFamily, updateFontFamily, searchHistory, removeFromHistory } = useApp()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('recommend')
 
@@ -403,7 +410,34 @@ export default function SettingsPage({ onClose, onRefresh, onSearchHistoryClick 
           {/* ═══ Interface + Account Tab ═══ */}
           {activeTab === 'interface' && (
             <div className="drawer-section">
-              <h3>主题颜色</h3>
+              <h3>字体大小</h3>
+              <div className="font-size-options">
+                {FONT_SIZE_OPTIONS.map(opt => (
+                  <button
+                    key={opt.value}
+                    className={`font-size-btn ${fontSize === opt.value ? 'active' : ''}`}
+                    onClick={() => updateFontSize(opt.value)}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+
+              <h3 style={{ marginTop: 20 }}>字体样式</h3>
+              <div className="setting-row">
+                <span>正文字体</span>
+                <select
+                  value={fontFamily}
+                  onChange={e => updateFontFamily(e.target.value)}
+                  className="filter-select"
+                >
+                  <option value="system">系统默认</option>
+                  <option value="kai">楷体</option>
+                  <option value="msyh">微软雅黑</option>
+                </select>
+              </div>
+
+              <h3 style={{ marginTop: 24 }}>主题颜色</h3>
               <div className="theme-presets">
                 {PRESETS.map(({ color, label }) => (
                   <button

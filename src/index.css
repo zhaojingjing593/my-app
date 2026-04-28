@@ -11,6 +11,13 @@
   --shadow-hover: 0 6px 24px rgba(139, 68, 180, 0.18);
   --radius: 14px;
   --radius-sm: 8px;
+  --font-size-base: 17px;
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei', 'Hiragino Sans GB', sans-serif;
+}
+
+html {
+  font-size: var(--font-size-base);
 }
 
 * {
@@ -20,12 +27,15 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
-    'Microsoft YaHei', 'Hiragino Sans GB', sans-serif;
+  font-family: var(--font-family);
   background: var(--color-bg);
   color: var(--text-primary);
   line-height: 1.6;
   min-height: 100vh;
+}
+
+button, a, input, select, textarea, [role="button"] {
+  touch-action: manipulation;
 }
 
 /* ─── Loading ─────────────────────────────────────────── */
@@ -1166,6 +1176,36 @@ body {
   background: none;
 }
 
+/* ─── Font Size Options ─────────────────────────── */
+.font-size-options {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.font-size-btn {
+  padding: 8px 14px;
+  background: var(--color-bg);
+  color: var(--text-primary);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  touch-action: manipulation;
+}
+.font-size-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+.font-size-btn.active {
+  background: var(--color-primary);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
 /* ─── Search History (in settings) ─────────────────── */
 .history-list {
   display: flex;
@@ -1368,8 +1408,16 @@ body {
     order: 3;
     flex-basis: 100%;
   }
+  .btn-search {
+    padding: 8px 14px;
+    flex-shrink: 0;
+  }
+  .search-input {
+    min-width: 0;
+    width: 100%;
+  }
   .search-content { padding: 14px; }
-  .paper-card { padding: 16px; }
+  .paper-card { padding: 14px; }
   .login-card { padding: 32px 22px; }
   .drawer, .drawer-wide, .drawer-settings { width: 100%; }
   .onboarding-card { padding: 28px 20px; }
@@ -1377,4 +1425,29 @@ body {
   .paper-title-en { font-size: 1.15rem; }
   .rec-filter-bar { gap: 10px; }
   .rec-title-row { width: 100%; justify-content: space-between; }
+  .btn-favorite {
+    font-size: 1.5rem;
+    padding: 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .search-header {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+  .header-title { font-size: 0.9rem; }
+  .search-content { padding: 10px; }
+  .paper-card { padding: 12px; }
+  .paper-title-en-main, .paper-title-cn { font-size: 1.1rem; }
+  .paper-title-en { font-size: 1rem; }
+  .drawer-header { padding: 12px 14px; }
+  .drawer-header h2 { font-size: 1rem; }
+  .drawer-body { padding: 14px; }
+  .drawer, .drawer-wide, .drawer-settings { width: 100%; }
+  .category-grid { gap: 4px; }
+  .category-chip { padding: 4px 10px; font-size: 0.78rem; }
+  .login-card { padding: 24px 16px; }
+  .login-logo h1 { font-size: 1.4rem; }
+  .results-header h3 { font-size: 0.85rem; }
 }

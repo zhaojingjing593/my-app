@@ -55,3 +55,26 @@ export const applyTheme = (hex) => {
   root.style.setProperty('--color-bg', bg)
   root.style.setProperty('--color-border', border)
 }
+
+export const FONT_SIZE_MAP = {
+  small: '15px',
+  medium: '17px',
+  large: '19px',
+  xlarge: '21px',
+}
+
+export const FONT_FAMILY_MAP = {
+  system: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif',
+  kai: '"KaiTi", "STKaiti", "Kaiti SC", 楷体, serif',
+  msyh: '"Microsoft YaHei", "微软雅黑", "PingFang SC", sans-serif',
+}
+
+export const applyFontSize = (sizeKey) => {
+  const root = document.documentElement
+  root.style.setProperty('--font-size-base', FONT_SIZE_MAP[sizeKey] || '17px')
+}
+
+export const applyFontFamily = (familyKey) => {
+  const root = document.documentElement
+  root.style.setProperty('--font-family', FONT_FAMILY_MAP[familyKey] || FONT_FAMILY_MAP.system)
+}

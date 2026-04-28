@@ -178,6 +178,32 @@ export const saveRecentDaysFilter = async (email, days) => {
   await setStore('users', users)
 }
 
+export const getFontSize = async (email) => {
+  if (!email) return 'medium'
+  const users = (await getStore('users')) || {}
+  const user = users[email] || {}
+  return user.fontSize || 'medium'
+}
+
+export const saveFontSize = async (email, fontSize) => {
+  const users = (await getStore('users')) || {}
+  users[email] = { ...(users[email] || {}), fontSize }
+  await setStore('users', users)
+}
+
+export const getFontFamily = async (email) => {
+  if (!email) return 'system'
+  const users = (await getStore('users')) || {}
+  const user = users[email] || {}
+  return user.fontFamily || 'system'
+}
+
+export const saveFontFamily = async (email, fontFamily) => {
+  const users = (await getStore('users')) || {}
+  users[email] = { ...(users[email] || {}), fontFamily }
+  await setStore('users', users)
+}
+
 // ─── Paper click tracking ───────────────────────────────────────────
 
 export const trackPaperClick = async (email, paper, source) => {

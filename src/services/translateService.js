@@ -33,15 +33,15 @@ export const setTranslationConfig = (config) => {
 
 export const getTranslationConfig = () => ({ ...translationConfig })
 
-// ─── Request throttling (200ms between API calls) ──────────────────
+// ─── Request throttling (50ms between API calls) ───────────────────
 
 let lastRequestTime = 0
 
 const throttle = async () => {
   const now = Date.now()
   const elapsed = now - lastRequestTime
-  if (elapsed < 200) {
-    await new Promise(resolve => setTimeout(resolve, 200 - elapsed))
+  if (elapsed < 50) {
+    await new Promise(resolve => setTimeout(resolve, 50 - elapsed))
   }
   lastRequestTime = Date.now()
 }
@@ -99,7 +99,7 @@ const deepseekTranslate = async (text, targetLang) => {
         temperature: 0.3,
         messages: [{ role: 'user', content: prompt }],
       }),
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(3000),
     })
     if (!res.ok) return null
     const data = await res.json()
@@ -199,6 +199,37 @@ const lookUpLocalDict = (text) => {
   return matched ? result : null
 }
 
+// ─── Google Translate (public, no key needed) ─────────────────────
+
+const googleTranslate = async (text, from, to) => {
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${from}&tl=${to}&dt=t&q=${encodeURIComponent(text.slice(0, 1000))}`
+    const res = await fetch(url, { signal: AbortSignal.timeout(4000) })
+    if (!res.ok) return null
+    const data = await res.json()
+    const result = data?.[0]?.map(x => x?.[0]).filter(Boolean).join('')
+    return result?.trim() || null
+  } catch {
+    return null
+  }
+}
+
+// ─── Youdao Translate (public, no key needed, works in China) ────────
+
+const youdaoTranslate = async (text, type = 'AUTO') => {
+  try {
+    const url = `https://fanyi.youdao.com/translate?i=${encodeURIComponent(text.slice(0, 500))}&doctype=json&type=${type}`
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(3000),
+      headers: { Referer: 'https://fanyi.youdao.com/' },
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    if (data.errorCode != 0 || !data.translateResult?.[0]?.[0]?.tgt) return null
+    return data.translateResult.flat().map(x => x.tgt).join('').trim() || null
+  } catch { return null }
+}
+
 // ─── CN → EN (for arXiv search) ─────────────────────────────────────
 
 export const translateToEnglish = async (text) => {
@@ -209,27 +240,36 @@ export const translateToEnglish = async (text) => {
   const cached = getCache()[key]
   if (cached) return cached
 
-  // Step 1: DeepSeek translation (if API key configured)
+  // Step 1: DeepSeek (if API key configured)
   if (translationConfig.apiKey) {
     const result = await deepseekTranslate(text, 'EN')
     if (result && !isChinese(result)) {
-      setCache(key, result)
-      return result
+      setCache(key, result); return result
     }
   }
 
-  // Step 2: Local dictionary fallback
-  const dictResult = lookUpLocalDict(text)
-  if (dictResult) {
-    setCache(key, dictResult)
-    return dictResult
+  // Step 2: Youdao Translate (China-friendly, no VPN needed)
+  const youdaoResult = await youdaoTranslate(text, 'ZH_CN2EN')
+  if (youdaoResult && !isChinese(youdaoResult)) {
+    setCache(key, youdaoResult); return youdaoResult
   }
 
-  // Step 3: Strip Chinese characters and return whatever is left
+  // Step 3: Google Translate (free fallback)
+  const googleResult = await googleTranslate(text, 'zh-CN', 'en')
+  if (googleResult && !isChinese(googleResult)) {
+    setCache(key, googleResult); return googleResult
+  }
+
+  // Step 4: Local dictionary fallback
+  const dictResult = lookUpLocalDict(text)
+  if (dictResult) {
+    setCache(key, dictResult); return dictResult
+  }
+
+  // Step 5: Strip Chinese characters and return whatever is left
   const stripped = text.replace(/[一-鿿]+/g, '').trim()
   if (stripped) {
-    setCache(key, stripped)
-    return stripped
+    setCache(key, stripped); return stripped
   }
 
   return text.trim()
@@ -245,13 +285,24 @@ export const translateToChinese = async (text) => {
   const cached = getCache()[key]
   if (cached) return cached
 
-  // Step 1: DeepSeek translation (if API key configured)
+  // Step 1: DeepSeek (if API key configured)
   if (translationConfig.apiKey) {
     const result = await deepseekTranslate(text, 'ZH')
     if (result && hasChineseContent(result)) {
-      setCache(key, result)
-      return result
+      setCache(key, result); return result
     }
+  }
+
+  // Step 2: Youdao Translate (China-friendly, no VPN needed)
+  const youdaoResult = await youdaoTranslate(text, 'EN2ZH_CN')
+  if (youdaoResult && hasChineseContent(youdaoResult)) {
+    setCache(key, youdaoResult); return youdaoResult
+  }
+
+  // Step 3: Google Translate (free fallback)
+  const googleResult = await googleTranslate(text, 'en', 'zh-CN')
+  if (googleResult && hasChineseContent(googleResult)) {
+    setCache(key, googleResult); return googleResult
   }
 
   return null

@@ -62,15 +62,9 @@ export const translatePapers = async (papers) => {
     const batch = papers.slice(i, i + BATCH_SIZE)
     await Promise.all(batch.map(async (paper) => {
       try {
-        const [cnTitle, cnSummary] = await Promise.all([
-          translateToChinese(paper.title),
-          translateToChinese(paper.summary.slice(0, 600)),
-        ])
-        paper.cnTitle = cnTitle || null
-        paper.cnSummary = cnSummary || null
+        paper.cnTitle = (await translateToChinese(paper.title)) || null
       } catch {
         paper.cnTitle = null
-        paper.cnSummary = null
       }
     }))
   }
