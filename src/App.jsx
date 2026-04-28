@@ -2,7 +2,10 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './components/LoginPage'
 import SearchPage from './components/SearchPage'
+import OnboardingPage from './components/OnboardingPage'
 import { getStore, setStore, applyTheme } from './services/storageService'
+import { isOnboardingDone } from './services/recommendationService'
+import { setTranslationConfig } from './services/translateService'
 
 const AppContext = createContext(null)
 export const useApp = () => useContext(AppContext)
@@ -13,6 +16,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null)
   const [themeColor, setThemeColor] = useState(DEFAULT_THEME)
   const [searchHistory, setSearchHistory] = useState([])
+  const [needsOnboarding, setNeedsOnboarding] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -21,11 +25,20 @@ export default function App() {
       if (session?.email) {
         const users = (await getStore('users')) || {}
         const prefs = users[session.email] || {}
-        const color = prefs.themeColor || DEFAULT_THEME
         setCurrentUser(session.email)
         setSearchHistory(prefs.searchHistory || [])
+        const color = prefs.themeColor || DEFAULT_THEME
         setThemeColor(color)
         applyTheme(color)
+
+        // Set translation config
+        if (prefs.deepseekApiKey) {
+          setTranslationConfig({ provider: 'deepseek', apiKey: prefs.deepseekApiKey })
+        }
+
+        // Check onboarding
+        const done = await isOnboardingDone(session.email)
+        setNeedsOnboarding(!done)
       } else {
         applyTheme(DEFAULT_THEME)
       }
@@ -39,15 +52,24 @@ export default function App() {
     await setStore('session', { email })
     const users = (await getStore('users')) || {}
     const prefs = users[email] || {}
-    const color = prefs.themeColor || DEFAULT_THEME
     setSearchHistory(prefs.searchHistory || [])
+    const color = prefs.themeColor || DEFAULT_THEME
     setThemeColor(color)
     applyTheme(color)
+
+    // Set translation config
+    if (prefs.deepseekApiKey) {
+      setTranslationConfig({ provider: 'deepseek', apiKey: prefs.deepseekApiKey })
+    }
+
+    const done = await isOnboardingDone(email)
+    setNeedsOnboarding(!done)
   }, [])
 
   const logout = useCallback(async () => {
     setCurrentUser(null)
     setSearchHistory([])
+    setNeedsOnboarding(false)
     await setStore('session', null)
   }, [])
 
@@ -100,8 +122,9 @@ export default function App() {
     }}>
       <HashRouter>
         <Routes>
-          <Route path="/" element={currentUser ? <Navigate to="/search" replace /> : <LoginPage />} />
+          <Route path="/" element={currentUser ? <Navigate to={needsOnboarding ? '/onboarding' : '/search'} replace /> : <LoginPage />} />
           <Route path="/search" element={currentUser ? <SearchPage /> : <Navigate to="/" replace />} />
+          <Route path="/onboarding" element={currentUser ? <OnboardingPage /> : <Navigate to="/" replace />} />
         </Routes>
       </HashRouter>
     </AppContext.Provider>

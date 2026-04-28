@@ -15,6 +15,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      webSecurity: true,
     },
     show: false,
     title: 'arXiv 论文推荐',

@@ -30,8 +30,10 @@
     "productName": "arXiv论文推荐",
     "copyright": "Copyright © 2024",
     "directories": {
-      "output": "dist/electron-build"
+      "output": "dist/electron-build",
+      "buildResources": "build"
     },
+    "icon": "build/icon.png",
     "files": [
       "dist/renderer/**/*",
       "electron/**/*",
@@ -53,6 +55,18 @@
           ]
         }
       ]
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "artifactName": "arXiv论文推荐-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,

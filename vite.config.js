@@ -17,10 +17,15 @@ export default defineConfig(({ mode }) => ({
         changeOrigin: true,
         rewrite: (path) => path.replace('/.netlify/functions/arxiv', '/api/query'),
       },
-      '/.netlify/functions/translate': {
-        target: 'https://translate.googleapis.com',
+      '/.netlify/functions/translate/mymemory': {
+        target: 'https://api.mymemory.translated.net',
         changeOrigin: true,
-        rewrite: (path) => path.replace('/.netlify/functions/translate', '/translate_a/single'),
+        rewrite: (path) => path.replace('/.netlify/functions/translate/mymemory', '/get'),
+      },
+      '/.netlify/functions/translate/youdao': {
+        target: 'https://fanyi.youdao.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/.netlify/functions/translate/youdao', '/translate'),
       },
     },
   },

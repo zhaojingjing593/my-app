@@ -6,17 +6,16 @@ import { getStore, setStore, hashPassword } from '../services/storageService'
 export default function LoginPage() {
   const { login } = useApp()
   const navigate = useNavigate()
-  const [isRegister, setIsRegister] = useState(false)
+  const [isRegister, setIsRegister] = useState(true)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [confirm, setConfirm] = useState('')
+  const [apiKey, setApiKey] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   const validate = () => {
     if (!email.includes('@')) return '请输入有效的邮箱地址'
     if (password.length < 6) return '密码至少6位'
-    if (isRegister && password !== confirm) return '两次密码不一致'
     return null
   }
 
@@ -33,7 +32,9 @@ export default function LoginPage() {
 
       if (isRegister) {
         if (users[email]) { setError('该邮箱已注册'); setLoading(false); return }
-        users[email] = { passwordHash: hash, themeColor: '#E8D5F5', searchHistory: [] }
+        const userData = { passwordHash: hash, themeColor: '#E8D5F5', searchHistory: [] }
+        if (apiKey.trim()) userData.deepseekApiKey = apiKey.trim()
+        users[email] = userData
         await setStore('users', users)
       } else {
         const user = users[email]
@@ -43,7 +44,7 @@ export default function LoginPage() {
 
       await login(email)
       navigate('/search', { replace: true })
-    } catch (err) {
+    } catch {
       setError('操作失败，请重试')
     } finally {
       setLoading(false)
@@ -55,7 +56,6 @@ export default function LoginPage() {
       <div className="login-card">
         <div className="login-logo">
           <h1>📄 arXiv 推荐</h1>
-          <p>搜索最新学术论文，支持中英文关键词</p>
         </div>
 
         {error && <div className="error-msg">{error}</div>}
@@ -84,13 +84,12 @@ export default function LoginPage() {
           </div>
           {isRegister && (
             <div className="form-group">
-              <label>确认密码</label>
+              <label>DeepSeek API Key（可选）</label>
               <input
                 type="password"
-                placeholder="再次输入密码"
-                value={confirm}
-                onChange={e => setConfirm(e.target.value)}
-                required
+                placeholder="粘贴你的 DeepSeek API Key"
+                value={apiKey}
+                onChange={e => setApiKey(e.target.value)}
               />
             </div>
           )}

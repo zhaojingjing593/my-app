@@ -4,5 +4,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getStore: (key) => ipcRenderer.invoke('store:get', key),
   setStore: (key, value) => ipcRenderer.invoke('store:set', key, value),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
+  baiduTranslate: (params) => ipcRenderer.invoke('baidu-translate', params),
   isElectron: true,
 })
