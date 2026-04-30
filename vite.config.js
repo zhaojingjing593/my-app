@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig(({ mode }) => ({
   plugins: [react()],
-  base: mode === 'electron' ? './' : '/',
+  base: mode === 'electron' ? './' : './',
   build: {
     outDir: mode === 'electron' ? 'dist/renderer' : 'dist/web',
     emptyOutDir: true,
