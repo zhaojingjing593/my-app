@@ -1,6 +1,7 @@
 import { getStore, setStore } from './storageService'
 import { fetchArxiv, translatePapers, extractKeywordsFromPapers } from './arxivService'
 import { translateToChinese, translateToEnglish } from './translateService'
+import { callYuanbao } from './aiProvider'
 
 const today = () => new Date().toISOString().split('T')[0]
 
@@ -449,7 +450,7 @@ export const exportSelectedFavorites = async (email, arxivIds) => {
 // Mutex to prevent concurrent DeepSeek API calls for the same paper
 const pendingSummaries = new Set()
 
-export const getChineseSummary = async (paper, deepseekApiKey, email) => {
+export const getChineseSummary = async (paper, deepseekApiKey, email, yuanbaoApiKey) => {
   if (!deepseekApiKey) {
     pendingSummaries.delete(paper.arxivId)
     return await fallbackTranslation(paper, email)
@@ -518,6 +519,39 @@ keyword1, keyword2, keyword3, keyword4, keyword5`,
     }
   } catch (err) {
     console.warn('DeepSeek API failed:', err.message)
+  }
+
+  // Retry with Yuanbao when DeepSeek fails
+  if (!summary && yuanbaoApiKey) {
+    try {
+      const content = await callYuanbao(yuanbaoApiKey, {
+        model: 'deepseek-chat',
+        max_tokens: 600,
+        messages: [{
+          role: 'user',
+          content: `分析以下论文，严格按照指定格式输出中文结果。从"关键结果、研究意义、实验方法、主要启发、亮点创新、热点预测、态势感知"中选择与该论文最相关的2项输出。
+
+标题：${paper.title}
+摘要：${paper.summary?.slice(0, 1000) || ''}
+
+输出格式（严格按照以下格式）：
+**总结：**
+（100-150字简要总结核心内容）
+
+**X：**
+（选择的第1个方面内容，X从列表中选）
+
+**Y：**
+（选择的第2个方面内容，Y从列表中选）
+
+**关键词：**
+keyword1, keyword2, keyword3, keyword4, keyword5`,
+        }],
+      }, AbortSignal.timeout(25000))
+      if (content) summary = content
+    } catch (err) {
+      console.warn('Yuanbao fallback failed:', err.message)
+    }
   }
 
   if (!summary) {

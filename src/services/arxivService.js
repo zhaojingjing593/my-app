@@ -1,4 +1,5 @@
 import { translateToEnglish, translateToChinese } from './translateService'
+import { callYuanbao } from './aiProvider'
 
 const parseArxivXML = (xmlText) => {
   const parser = new DOMParser()
@@ -90,7 +91,8 @@ export const searchByCategories = async (categories, maxResults = 5) => {
 
 // ─── DeepSeek keyword optimization ──────────────────────────────────
 
-const optimizeKeywordsWithDeepSeek = async (chineseQuery, apiKey) => {
+const optimizeKeywordsWithDeepSeek = async (chineseQuery, apiKey, yuanbaoApiKey) => {
+  let text = ''
   try {
     const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
       method: 'POST',
@@ -110,10 +112,27 @@ const optimizeKeywordsWithDeepSeek = async (chineseQuery, apiKey) => {
     })
     if (res.ok) {
       const data = await res.json()
-      const text = data?.choices?.[0]?.message?.content?.trim() || ''
-      return text.replace(/[・•\-–—]/g, ' ').replace(/\s+/g, ' ')
+      text = data?.choices?.[0]?.message?.content?.trim() || ''
     }
-  } catch { /* fall through to translate */ }
+  } catch { /* fall through */ }
+
+  if (!text && yuanbaoApiKey) {
+    try {
+      const content = await callYuanbao(yuanbaoApiKey, {
+        model: 'deepseek-chat',
+        max_tokens: 100,
+        messages: [{
+          role: 'user',
+          content: `用户搜索中文关键词"${chineseQuery}"查找学术论文。请提取3-5个最关键的英文搜索词（空格分隔），只返回英文关键词，不要解释。例如："量子算法 引力波 探测" → "quantum algorithm gravitational wave detection"`,
+        }],
+      }, AbortSignal.timeout(10000))
+      if (content) text = content
+    } catch { /* fall through */ }
+  }
+
+  if (text) {
+    return text.replace(/[・•\-–—]/g, ' ').replace(/\s+/g, ' ')
+  }
   return null
 }
 
@@ -205,7 +224,7 @@ const translateOrThrow = async (text) => {
   return translated
 }
 
-export const searchArxiv = async (keyword, type = 'all', deepseekApiKey = '') => {
+export const searchArxiv = async (keyword, type = 'all', deepseekApiKey = '', yuanbaoApiKey = '') => {
   let query = ''
 
   if (type === 'author') {
@@ -296,7 +315,7 @@ export const searchArxiv = async (keyword, type = 'all', deepseekApiKey = '') =>
 
   // If Chinese query and DeepSeek available, use it for keyword optimization
   if (/[一-龥]/.test(kw) && deepseekApiKey) {
-    const optimized = await optimizeKeywordsWithDeepSeek(kw, deepseekApiKey)
+    const optimized = await optimizeKeywordsWithDeepSeek(kw, deepseekApiKey, yuanbaoApiKey)
     if (optimized) {
       terms = optimized.split(/\s+/).filter(Boolean)
     }
@@ -536,3 +555,83 @@ export const generateCitation = (paper, format = 'bibtex') => {
     authors.slice(0, 3).join(', ') + (authors.length > 3 ? ' et al.' : '') + '.'
   return `${plainAuthors} (${year}). "${title}". arXiv:${arxivId}. ${url}`
 }
+
+// ─── References export ──────────────────────────────────────────────
+
+export const fetchReferences = async (papers) => {
+  if (!papers?.length) return { references: [], errors: [] }
+
+  const refMap = new Map()
+  const errors = []
+  const CONCURRENCY = 5
+
+  for (let i = 0; i < papers.length; i += CONCURRENCY) {
+    const batch = papers.slice(i, i + CONCURRENCY)
+    const results = await Promise.allSettled(
+      batch.map(paper =>
+        fetch(
+          `https://api.semanticscholar.org/graph/v1/paper/ArXiv:${paper.arxivId}/references?limit=100&fields=title,authors,year,venue,externalIds`,
+          { signal: AbortSignal.timeout(10000) }
+        ).then(async res => {
+          if (res.status === 404) return []
+          if (!res.ok) throw new Error(`HTTP ${res.status}`)
+          const data = await res.json()
+          return data.data || []
+        })
+      )
+    )
+
+    results.forEach((result, idx) => {
+      if (result.status === 'fulfilled') {
+        for (const item of result.value) {
+          const p = item.citedPaper
+          if (!p || !p.title) continue
+          const key = p.externalIds?.ArXiv || p.paperId
+          if (!key) continue
+          if (refMap.has(key)) {
+            refMap.get(key).sourcePapers.push(batch[idx].arxivId)
+          } else {
+            refMap.set(key, {
+              title: p.title,
+              authors: (p.authors || []).map(a => a.name),
+              year: p.year,
+              venue: p.venue || '',
+              arxivId: p.externalIds?.ArXiv || '',
+              url: p.externalIds?.ArXiv
+                ? `https://arxiv.org/abs/${p.externalIds.ArXiv}`
+                : '',
+              sourcePapers: [batch[idx].arxivId],
+            })
+          }
+        }
+      } else {
+        errors.push(batch[idx].arxivId)
+      }
+    })
+  }
+
+  return { references: [...refMap.values()], errors }
+}
+
+export const generateRefBibtex = (refs) => {
+  return refs.map(ref => {
+    const firstAuthor = ref.authors[0] || 'Unknown'
+    const lastName = firstAuthor.split(' ').pop()?.replace(/[^a-zA-Z]/g, '') || 'Unknown'
+    const key = `${lastName}${ref.year || '????'}_${ref.arxivId || ref.paperId?.slice(0, 8)}`
+    const authorStr = ref.authors.map(a => {
+      const parts = a.trim().split(/\s+/)
+      return parts.length < 2 ? a : `${parts[parts.length - 1]}, ${parts.slice(0, -1).join(' ')}`
+    }).join(' and ')
+    return [
+      `@article{${key},`,
+      `  title={${ref.title}},`,
+      `  author={${authorStr}},`,
+      ref.venue ? `  journal={${ref.venue}},` : '',
+      `  year={${ref.year || '????'}},`,
+      ref.url ? `  url={${ref.url}}` : '',
+      '}',
+    ].filter(Boolean).join('\n')
+  }).join('\n\n')
+}
+
+export const generateRefJson = (refs) => JSON.stringify(refs, null, 2)

@@ -409,6 +409,41 @@ button, a, input, select, textarea, [role="button"] {
   margin-left: 4px;
 }
 
+/* ─── References Export Bar ────────────────────────────── */
+.ref-export-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 1000px;
+  margin: 0 auto 16px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+.ref-export-btn {
+  padding: 5px 14px;
+  background: var(--color-bg);
+  color: var(--text-secondary);
+  border: 1.5px solid var(--color-border);
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.ref-export-btn:hover { border-color: var(--color-accent); color: var(--color-accent); }
+.ref-export-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.ref-export-status {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+.ref-export-error { color: #c0392b; }
+.ref-export-ok { color: #27ae60; }
+.ref-export-download {
+  display: flex;
+  gap: 6px;
+}
+
 .papers-list {
   display: flex;
   flex-direction: column;

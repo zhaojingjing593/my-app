@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useApp } from '../App'
 import PaperCard from './PaperCard'
 import SettingsPage from './SettingsPage'
-import { searchArxiv, fetchCitationCounts, sortPapers, SORT_MODES } from '../services/arxivService'
+import { searchArxiv, fetchCitationCounts, sortPapers, SORT_MODES, fetchReferences, generateRefBibtex, generateRefJson } from '../services/arxivService'
 import { getStore } from '../services/storageService'
 import { setTranslationConfig } from '../services/translateService'
 import {
@@ -46,6 +46,11 @@ export default function SearchPage() {
 
   const searchTokenRef = useRef(0)
   const refreshTimerRef = useRef(null)
+
+  // References export
+  const [refsLoading, setRefsLoading] = useState(false)
+  const [refsResult, setRefsResult] = useState(null)
+  const [refsError, setRefsError] = useState('')
 
   useEffect(() => {
     loadRecs()
@@ -148,6 +153,46 @@ export default function SearchPage() {
   // Apply sort whenever sortMode or papers change (title search uses algorithm order)
   const sortedPapers = (sortMode && searchType !== 'title') ? sortPapers(papers, sortMode) : papers
 
+  const doExportRefs = async () => {
+    if (refsLoading) return
+    setRefsLoading(true)
+    setRefsResult(null)
+    setRefsError('')
+    try {
+      const result = await fetchReferences(papers)
+      setRefsResult(result)
+      if (result.references.length === 0) {
+        setRefsError('未找到引用文献数据')
+      }
+    } catch (err) {
+      setRefsError(err.message || '获取引用文献失败')
+    } finally {
+      setRefsLoading(false)
+    }
+  }
+
+  const downloadRefs = (content, filename, mimeType) => {
+    const blob = new Blob([content], { type: mimeType })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleDownloadBibtex = () => {
+    if (!refsResult?.references?.length) return
+    const bibtex = generateRefBibtex(refsResult.references)
+    downloadRefs(bibtex, `arxiv-refs-${new Date().toISOString().split('T')[0]}.bib`, 'text/plain')
+  }
+
+  const handleDownloadJson = () => {
+    if (!refsResult?.references?.length) return
+    const json = generateRefJson(refsResult.references)
+    downloadRefs(json, `arxiv-refs-${new Date().toISOString().split('T')[0]}.json`, 'application/json')
+  }
+
   const doSearch = async (kw, type = searchType) => {
     const trimmed = kw.trim()
     if (!trimmed) return
@@ -155,14 +200,18 @@ export default function SearchPage() {
     setStatus('loading')
     setSearchedKeyword(trimmed)
     try {
-      // Get DeepSeek API key for search optimization and title/summary translation
+      // Get API keys for search optimization and title/summary translation
       const users = (await getStore('users')) || {}
       const user = users[currentUser] || {}
       const apiKey = user.deepseekApiKey || ''
+      const ybKey = user.yuanbaoApiKey || ''
       if (apiKey) {
         setTranslationConfig({ provider: 'deepseek', apiKey })
       }
-      const results = await searchArxiv(trimmed, type, apiKey)
+      if (ybKey) {
+        setTranslationConfig({ yuanbaoApiKey: ybKey })
+      }
+      const results = await searchArxiv(trimmed, type, apiKey, ybKey)
       if (token !== searchTokenRef.current) return
       setPapers(results)
       // Reset sort mode based on search type after search
@@ -385,6 +434,31 @@ export default function SearchPage() {
                 {sorting && <span className="sort-loading">获取引用数据...</span>}
               </div>
             )}
+            <div className="ref-export-bar">
+              <button
+                className="ref-export-btn"
+                onClick={doExportRefs}
+                disabled={refsLoading}
+              >
+                {refsLoading ? '↻ 获取中...' : '📎 导出引用文献'}
+              </button>
+              {refsLoading && <span className="ref-export-status">正在查询引用文献...</span>}
+              {refsError && !refsLoading && (
+                <span className="ref-export-status ref-export-error">{refsError}</span>
+              )}
+              {refsResult && refsResult.references.length > 0 && !refsLoading && (
+                <span className="ref-export-status ref-export-ok">
+                  共 {refsResult.references.length} 篇去重引用文献
+                  {refsResult.errors.length > 0 && `（${refsResult.errors.length} 篇论文查询失败）`}
+                </span>
+              )}
+              {refsResult && refsResult.references.length > 0 && !refsLoading && (
+                <div className="ref-export-download">
+                  <button className="chip" onClick={handleDownloadBibtex}>下载 BibTeX</button>
+                  <button className="chip" onClick={handleDownloadJson}>下载 JSON</button>
+                </div>
+              )}
+            </div>
             <div className="papers-list">
               {sortedPapers.map(paper => (
                 <PaperCard

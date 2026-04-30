@@ -1,6 +1,8 @@
 // Translation service — DeepSeek AI + local dictionary fallback
 // Results are cached locally to avoid redundant API calls
 
+import { callYuanbao } from './aiProvider'
+
 const isChinese = (text) => /[一-鿿]/.test(text)
 
 const hasChineseContent = (text) =>
@@ -13,6 +15,7 @@ const CONFIG_KEY = 'translationConfig'
 let translationConfig = {
   provider: 'deepseek',
   apiKey: '',
+  yuanbaoApiKey: '',
 }
 
 // Auto-load persisted config on module init
@@ -85,6 +88,15 @@ const deepseekTranslate = async (text, targetLang) => {
   const prompt = isToChinese
     ? `请将以下英文论文内容翻译成中文，保持学术准确性，直接返回翻译结果：\n\n${text.slice(0, 2000)}`
     : `请将以下中文翻译成英文，只返回翻译结果：\n\n${text.slice(0, 2000)}`
+  const requestBody = {
+    model: 'deepseek-chat',
+    max_tokens: 1000,
+    temperature: 0.3,
+    messages: [{ role: 'user', content: prompt }],
+  }
+  const signal = AbortSignal.timeout(3000)
+
+  // Try DeepSeek first
   try {
     await throttle()
     const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
@@ -93,20 +105,26 @@ const deepseekTranslate = async (text, targetLang) => {
         'Authorization': `Bearer ${key}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'deepseek-chat',
-        max_tokens: 1000,
-        temperature: 0.3,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-      signal: AbortSignal.timeout(3000),
+      body: JSON.stringify(requestBody),
+      signal,
     })
     if (!res.ok) return null
     const data = await res.json()
     return data?.choices?.[0]?.message?.content?.trim() || null
   } catch {
-    return null
+    // fall through to Yuanbao fallback
   }
+
+  // Retry with Yuanbao when DeepSeek fails
+  if (translationConfig.yuanbaoApiKey) {
+    try {
+      return await callYuanbao(translationConfig.yuanbaoApiKey, requestBody, signal)
+    } catch {
+      return null
+    }
+  }
+
+  return null
 }
 
 // ─── Local Chinese→English dictionary for common CS terms ─────────
