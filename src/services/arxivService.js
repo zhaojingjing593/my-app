@@ -167,11 +167,11 @@ const multiStrategySearch = async (terms, maxResults = 10) => {
 
   // Strategy 3: If still few results, search individual key terms (sequential, rare case)
   if (results.length < 3) {
-    const keyTerms = terms.filter(t => t.length > 3).slice(0, 3)
+    const keyTerms = terms.filter(t => t.length >= 2).slice(0, 5)
     for (const term of keyTerms) {
       if (results.length >= maxResults) break
       try {
-        const singlePapers = await fetchArxiv(`search_query=all:${encodeURIComponent(term)}`, 5)
+        const singlePapers = await fetchArxiv(`search_query=all:${encodeURIComponent(term)}`, 8)
         for (const p of singlePapers) {
           if (!seen.has(p.arxivId)) {
             seen.add(p.arxivId)
@@ -196,7 +196,12 @@ const multiStrategySearch = async (terms, maxResults = 10) => {
 const translateOrThrow = async (text) => {
   if (!/[一-龥]/.test(text)) return text
   const translated = await translateToEnglish(text)
-  if (/[一-龥]/.test(translated)) throw new Error('TRANSLATION_FAILED')
+  if (/[一-龥]/.test(translated)) {
+    // Strip remaining Chinese characters instead of throwing — keeps partial translations usable
+    const stripped = translated.replace(/[^\x00-\x7F]+/g, ' ').replace(/\s+/g, ' ').trim()
+    if (stripped.length < 2) throw new Error('TRANSLATION_FAILED')
+    return stripped
+  }
   return translated
 }
 
@@ -480,4 +485,54 @@ export const extractKeywordsFromPapers = (papers, topN = 10) => {
   const scored = Object.entries(aggregated).map(([term, score]) => ({ term, score }))
   scored.sort((a, b) => b.score - a.score)
   return scored.slice(0, topN).map(s => s.term)
+}
+
+// ─── Citation export ─────────────────────────────────────────────────
+
+export const generateCitation = (paper, format = 'bibtex') => {
+  const year = paper.date ? paper.date.substring(0, 4) : '????'
+  const authors = paper.authors || []
+  const arxivId = paper.arxivId || ''
+  const title = paper.title || ''
+  const url = paper.url || `https://arxiv.org/abs/${arxivId}`
+
+  if (format === 'bibtex') {
+    const firstAuthorLastName =
+      (authors[0] || '').split(' ').pop().replace(/[^a-zA-Z]/g, '') || 'Unknown'
+    const key = `${firstAuthorLastName}${year}_${arxivId.replace(/\//g, '_')}`
+    const authorStr = authors
+      .map(a => {
+        const parts = a.trim().split(/\s+/)
+        return parts.length < 2 ? a : `${parts[parts.length - 1]}, ${parts.slice(0, -1).join(' ')}`
+      })
+      .join(' and ')
+    return (
+      `@article{${key},\n` +
+      `  title={${title}},\n` +
+      `  author={${authorStr}},\n` +
+      `  journal={arXiv preprint arXiv:${arxivId}},\n` +
+      `  year={${year}},\n` +
+      `  url={${url}}\n}`
+    )
+  }
+
+  if (format === 'apa') {
+    const fmtAPA = (name) => {
+      const parts = name.trim().split(/\s+/)
+      if (parts.length < 2) return name
+      const last = parts[parts.length - 1]
+      const initials = parts.slice(0, -1).map(p => p[0] + '.').join(' ')
+      return `${last}, ${initials}`
+    }
+    let authorStr = ''
+    if (authors.length === 1) authorStr = fmtAPA(authors[0]) + '.'
+    else if (authors.length > 1)
+      authorStr = authors.slice(0, -1).map(fmtAPA).join(', ') + ', & ' + fmtAPA(authors[authors.length - 1]) + '.'
+    return `${authorStr} (${year}). ${title}. arXiv preprint arXiv:${arxivId}. ${url}`
+  }
+
+  // plain text
+  const plainAuthors = authors.length === 0 ? '' :
+    authors.slice(0, 3).join(', ') + (authors.length > 3 ? ' et al.' : '') + '.'
+  return `${plainAuthors} (${year}). "${title}". arXiv:${arxivId}. ${url}`
 }

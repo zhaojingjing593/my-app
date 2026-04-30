@@ -174,7 +174,7 @@ export const getRecentDaysFilter = async (email) => {
 
 export const saveRecentDaysFilter = async (email, days) => {
   const users = (await getStore('users')) || {}
-  users[email] = { ...(users[email] || {}), recentDays }
+  users[email] = { ...(users[email] || {}), recentDays: days }
   await setStore('users', users)
 }
 

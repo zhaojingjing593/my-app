@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { openExternalLink, getStore } from '../services/storageService'
 import { getChineseSummary, toggleFavorite, isFavorited, trackPaperClick, parseStructuredSummary } from '../services/recommendationService'
+import { generateCitation } from '../services/arxivService'
 import { useApp } from '../App'
 
 const formatDate = (dateStr) => {
@@ -16,6 +17,8 @@ export default function PaperCard({ paper, searchKeyword = '', source = 'search'
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [summaryError, setSummaryError] = useState(false)
   const [faved, setFaved] = useState(false)
+  const [citeOpen, setCiteOpen] = useState(false)
+  const [citeCopied, setCiteCopied] = useState('')
 
   useEffect(() => {
     isFavorited(currentUser, paper.arxivId).then(setFaved)
@@ -63,6 +66,22 @@ export default function PaperCard({ paper, searchKeyword = '', source = 'search'
     }
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleCite = async (fmt) => {
+    const text = generateCitation(paper, fmt)
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch {
+      const el = document.createElement('textarea')
+      el.value = text
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand('copy')
+      document.body.removeChild(el)
+    }
+    setCiteCopied(fmt)
+    setTimeout(() => { setCiteCopied(''); setCiteOpen(false) }, 2000)
   }
 
   const handleFavorite = async (e) => {
@@ -202,6 +221,30 @@ export default function PaperCard({ paper, searchKeyword = '', source = 'search'
         <button className="btn-copy" onClick={handleCopy}>
           {copied ? '✓ 已复制' : '复制链接'}
         </button>
+        <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+          <button className="btn-copy" onClick={() => setCiteOpen(o => !o)}>
+            引用
+          </button>
+          {citeOpen && (
+            <div style={{
+              position: 'absolute', bottom: '110%', left: 0,
+              background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+              borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              display: 'flex', flexDirection: 'column', zIndex: 100, minWidth: '110px',
+            }}>
+              {[['bibtex', 'BibTeX'], ['apa', 'APA'], ['plain', '纯文本']].map(([fmt, label]) => (
+                <button key={fmt} onClick={() => handleCite(fmt)} style={{
+                  padding: '7px 14px', background: 'none', border: 'none',
+                  cursor: 'pointer', textAlign: 'left', fontSize: '13px',
+                  color: citeCopied === fmt ? 'var(--color-primary)' : 'var(--color-text)',
+                  borderBottom: fmt !== 'plain' ? '1px solid var(--color-border)' : 'none',
+                }}>
+                  {citeCopied === fmt ? '✓ 已复制' : label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
