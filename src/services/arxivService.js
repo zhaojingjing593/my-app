@@ -300,7 +300,7 @@ export const searchArxiv = async (keyword, type = 'all', deepseekApiKey = '') =>
 
   // If Chinese query and DeepSeek available, use it for keyword optimization
   if (/[一-龥]/.test(kw) && deepseekApiKey) {
-    const optimized = await optimizeKeywordsWithDeepSeek(kw, deepseekApiKey, yuanbaoApiKey)
+    const optimized = await optimizeKeywordsWithDeepSeek(kw, deepseekApiKey)
     if (optimized) {
       terms = optimized.split(/\s+/).filter(Boolean)
     }
