@@ -51,10 +51,6 @@ export default function SettingsPage({ onClose, onRefresh, onSearchHistoryClick 
   const [apiKeySaved, setApiKeySaved] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState('')
-  const [yuanbaoApiKey, setYuanbaoApiKey] = useState('')
-  const [yuanbaoApiKeySaved, setYuanbaoApiKeySaved] = useState(false)
-  const [yuanbaoTesting, setYuanbaoTesting] = useState(false)
-  const [yuanbaoTestResult, setYuanbaoTestResult] = useState('')
 
   // Recommendation state
   const [autoRefresh, setAutoRefresh] = useState(0)
@@ -77,7 +73,6 @@ export default function SettingsPage({ onClose, onRefresh, onSearchHistoryClick 
     const users = (await getStore('users')) || {}
     const user = users[currentUser] || {}
     setApiKey(user.deepseekApiKey || '')
-    setYuanbaoApiKey(user.yuanbaoApiKey || '')
     try {
       const [interval, days] = await Promise.all([
         getAutoRefreshInterval(currentUser),
@@ -161,59 +156,6 @@ export default function SettingsPage({ onClose, onRefresh, onSearchHistoryClick 
       setTestResult('❌ 网络错误，请检查连接')
     } finally {
       setTesting(false)
-    }
-  }
-
-  // ─── Yuanbao API ─────────────────────────────────────
-
-  const saveYuanbaoApiKey = async () => {
-    const users = (await getStore('users')) || {}
-    users[currentUser] = { ...(users[currentUser] || {}), yuanbaoApiKey: yuanbaoApiKey.trim() }
-    await setStore('users', users)
-    setTranslationConfig({ yuanbaoApiKey: yuanbaoApiKey.trim() })
-    setYuanbaoApiKeySaved(true)
-    setTimeout(() => setYuanbaoApiKeySaved(false), 2000)
-  }
-
-  const clearYuanbaoApiKey = async () => {
-    setYuanbaoApiKey('')
-    const users = (await getStore('users')) || {}
-    users[currentUser] = { ...(users[currentUser] || {}), yuanbaoApiKey: '' }
-    await setStore('users', users)
-    setTranslationConfig({ yuanbaoApiKey: '' })
-  }
-
-  const testYuanbaoApiKey = async () => {
-    if (!yuanbaoApiKey.trim()) return
-    setYuanbaoTesting(true)
-    setYuanbaoTestResult('')
-    try {
-      const res = await fetch('https://api.hunyuan.cloud.tencent.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${yuanbaoApiKey.trim()}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'hunyuan-turbos-latest',
-          max_tokens: 10,
-          messages: [{ role: 'user', content: 'hi' }],
-        }),
-      })
-      if (res.ok) {
-        setYuanbaoTestResult('✅ Key 有效！')
-      } else if (res.status === 401) {
-        setYuanbaoTestResult('❌ Key 无效，请检查')
-      } else if (res.status === 400) {
-        // 400 can happen with valid key but bad request — key is likely fine
-        setYuanbaoTestResult('✅ Key 有效！')
-      } else {
-        setYuanbaoTestResult(`❌ 错误: ${res.status}`)
-      }
-    } catch {
-      setYuanbaoTestResult('❌ 网络错误，请检查连接')
-    } finally {
-      setYuanbaoTesting(false)
     }
   }
 
@@ -463,36 +405,6 @@ export default function SettingsPage({ onClose, onRefresh, onSearchHistoryClick 
                 </a>
               </p>
 
-              <h3 style={{ marginTop: 24 }}>腾讯元宝 API Key（备用）</h3>
-              <p className="section-desc">当 DeepSeek 请求失败时自动切换到腾讯混元模型，可选配置。</p>
-              <div className="api-key-input-row">
-                <input
-                  type="password"
-                  className="api-key-input"
-                  placeholder="输入腾讯元宝 API Key（可选）"
-                  value={yuanbaoApiKey}
-                  onChange={e => setYuanbaoApiKey(e.target.value)}
-                />
-              </div>
-              <div className="api-key-actions">
-                <button className="btn-primary-sm" onClick={saveYuanbaoApiKey}>
-                  {yuanbaoApiKeySaved ? '✓ 已保存' : '保存'}
-                </button>
-                {yuanbaoApiKey && (
-                  <button className="btn-secondary-sm" onClick={clearYuanbaoApiKey}>清除</button>
-                )}
-                <button className="btn-secondary-sm" onClick={testYuanbaoApiKey} disabled={yuanbaoTesting}>
-                  {yuanbaoTesting ? '测试中...' : '测试连接'}
-                </button>
-              </div>
-              {yuanbaoTestResult && (
-                <p className="test-result">{yuanbaoTestResult}</p>
-              )}
-              <p className="api-key-link" style={{ marginTop: 12 }}>
-                <a href="#" onClick={e => { e.preventDefault(); openExternalLink('https://cloud.tencent.com/product/hunyuan') }}>
-                  → 去腾讯云开通混元大模型 API
-                </a>
-              </p>
             </div>
           )}
 

@@ -45,10 +45,6 @@ export default function App() {
         if (prefs.deepseekApiKey) {
           setTranslationConfig({ provider: 'deepseek', apiKey: prefs.deepseekApiKey })
         }
-        if (prefs.yuanbaoApiKey) {
-          setTranslationConfig({ yuanbaoApiKey: prefs.yuanbaoApiKey })
-        }
-
         // Check onboarding
         const done = await isOnboardingDone(session.email)
         setNeedsOnboarding(!done)
@@ -76,10 +72,6 @@ export default function App() {
     if (prefs.deepseekApiKey) {
       setTranslationConfig({ provider: 'deepseek', apiKey: prefs.deepseekApiKey })
     }
-    if (prefs.yuanbaoApiKey) {
-      setTranslationConfig({ yuanbaoApiKey: prefs.yuanbaoApiKey })
-    }
-
     // Load font preferences
     const fs = await getFontSize(email)
     const ff = await getFontFamily(email)

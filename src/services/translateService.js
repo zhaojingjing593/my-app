@@ -1,7 +1,6 @@
 // Translation service — DeepSeek AI + local dictionary fallback
 // Results are cached locally to avoid redundant API calls
 
-import { callYuanbao } from './aiProvider'
 
 const isChinese = (text) => /[一-鿿]/.test(text)
 
@@ -15,7 +14,6 @@ const CONFIG_KEY = 'translationConfig'
 let translationConfig = {
   provider: 'deepseek',
   apiKey: '',
-  yuanbaoApiKey: '',
 }
 
 // Auto-load persisted config on module init
@@ -112,19 +110,8 @@ const deepseekTranslate = async (text, targetLang) => {
     const data = await res.json()
     return data?.choices?.[0]?.message?.content?.trim() || null
   } catch {
-    // fall through to Yuanbao fallback
+    return null
   }
-
-  // Retry with Yuanbao when DeepSeek fails
-  if (translationConfig.yuanbaoApiKey) {
-    try {
-      return await callYuanbao(translationConfig.yuanbaoApiKey, requestBody, signal)
-    } catch {
-      return null
-    }
-  }
-
-  return null
 }
 
 // ─── Local Chinese→English dictionary for common CS terms ─────────

@@ -31,8 +31,7 @@ export default function PaperCard({ paper, searchKeyword = '', source = 'search'
     try {
       const users = (await getStore('users')) || {}
       const dsk = users[currentUser]?.deepseekApiKey || ''
-      const yb = users[currentUser]?.yuanbaoApiKey || ''
-      const text = await getChineseSummary(paper, dsk, currentUser, yb)
+      const text = await getChineseSummary(paper, dsk, currentUser)
       setSummary(text || null)
     } catch {
       setSummaryError(true)
