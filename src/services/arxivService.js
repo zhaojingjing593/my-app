@@ -76,7 +76,13 @@ const buildArxivUrl = (query, maxResults) =>
 
 const buildProxyUrl = (proxyTemplate, directUrl) => {
   if (proxyTemplate.includes('{url}')) {
-    return proxyTemplate.replace('{url}', encodeURIComponent(directUrl))
+    // The proxy decodes the quest param once, so characters that are
+    // invalid in URLs (space, ") need an extra encoding layer to
+    // survive as %20 and %22 in the forwarded request.
+    let encoded = encodeURIComponent(directUrl)
+    encoded = encoded.replace(/%20/g, '%2520')
+    encoded = encoded.replace(/%22/g, '%2522')
+    return proxyTemplate.replace('{url}', encoded)
   }
   // Direct base-URL replacement (Cloudflare Worker style)
   return directUrl.replace(ARXIV_API, proxyTemplate)
@@ -286,21 +292,16 @@ export const searchArxiv = async (keyword, type = 'all', deepseekApiKey = '') =>
 
     let papers = []
 
-    // Strategy 1: exact author name (no quotes for proxy compatibility)
-    try {
-      const nameQuery = cleanName.replace(/\s+/g, '_')
-      query = `search_query=au:${encodeURIComponent(nameQuery)}`
-      papers = await fetchArxiv(query, 10)
-    } catch {}
+    // Strategy 1: exact author name
+    query = `search_query=au:"${cleanName}"`
+    papers = await fetchArxiv(query, 10)
 
     // Strategy 2: try last name only (if exact match returned nothing)
     if (papers.length === 0) {
       const lastName = cleanName.split(' ').filter(Boolean).pop()
       if (lastName && lastName.length > 2) {
-        try {
-          query = `search_query=au:${encodeURIComponent(lastName)}`
-          papers = await fetchArxiv(query, 10)
-        } catch {}
+        query = `search_query=au:"${lastName}"`
+        papers = await fetchArxiv(query, 10)
       }
     }
 
@@ -308,10 +309,8 @@ export const searchArxiv = async (keyword, type = 'all', deepseekApiKey = '') =>
     if (papers.length === 0) {
       const lastName = cleanName.split(' ').filter(Boolean).pop()
       if (lastName && lastName.length > 2) {
-        try {
-          query = `search_query=all:${encodeURIComponent(lastName)}`
-          papers = await fetchArxiv(query, 5)
-        } catch {}
+        query = `search_query=all:${encodeURIComponent(lastName)}`
+        papers = await fetchArxiv(query, 5)
       }
     }
 
@@ -334,10 +333,9 @@ export const searchArxiv = async (keyword, type = 'all', deepseekApiKey = '') =>
 
     let papers = []
 
-    // Strategy 1: exact phrase in title field (no quotes for proxy compatibility)
+    // Strategy 1: exact phrase in title field
     try {
-      const titleQuery = kw.replace(/\s+/g, '_')
-      query = `search_query=ti:${encodeURIComponent(titleQuery)}`
+      query = `search_query=ti:"${kw}"`
       papers = await fetchArxiv(query, 10)
     } catch {}
 
