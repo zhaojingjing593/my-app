@@ -11,6 +11,7 @@ import {
 } from '../services/recommendationService'
 import { setTranslationConfig } from '../services/translateService'
 import { safeFetch } from '../services/apiService'
+import { setProxyUrl, getConfiguredProxyUrl } from '../services/arxivService'
 
 const PRESETS = [
   { color: '#E8D5F5', label: '浅紫' },
@@ -60,6 +61,9 @@ export default function SettingsPage({ onClose, onRefresh, onSearchHistoryClick 
   // Export/Import
   const [importStatus, setImportStatus] = useState('')
 
+  // arXiv Proxy URL
+  const [arxivProxy, setArxivProxy] = useState('')
+
   // Category management
   const [categories, setCategories] = useState([])
   const [customCategories, setCustomCategories] = useState([])
@@ -74,6 +78,7 @@ export default function SettingsPage({ onClose, onRefresh, onSearchHistoryClick 
     const users = (await getStore('users')) || {}
     const user = users[currentUser] || {}
     setApiKey(user.deepseekApiKey || '')
+    setArxivProxy(getConfiguredProxyUrl())
     try {
       const [interval, days] = await Promise.all([
         getAutoRefreshInterval(currentUser),
@@ -405,6 +410,32 @@ export default function SettingsPage({ onClose, onRefresh, onSearchHistoryClick 
                   → 去 DeepSeek 官网注册获取 Key
                 </a>
               </p>
+
+              <h3 style={{ marginTop: 24 }}>arXiv API 代理</h3>
+              <p className="section-desc">
+                国内直接访问 arXiv API 可能被 CORS 拦截。部署一个{' '}
+                <a href="#" onClick={e => { e.preventDefault(); openExternalLink('https://workers.cloudflare.com') }}>
+                  Cloudflare Worker
+                </a>{' '}
+                作为代理即可解决（免费，每月10万次）。代码在项目的 proxy 文件夹。
+              </p>
+              <div className="api-key-input-row" style={{ marginTop: 8 }}>
+                <input
+                  type="text"
+                  className="api-key-input"
+                  placeholder="输入 arXiv 代理 URL（如：https://arxiv.xxx.workers.dev）"
+                  value={arxivProxy}
+                  onChange={e => setArxivProxy(e.target.value)}
+                />
+              </div>
+              <div className="api-key-actions">
+                <button className="btn-primary-sm" onClick={() => { setProxyUrl(arxivProxy.trim()); }}>
+                  保存代理
+                </button>
+                {arxivProxy && (
+                  <button className="btn-secondary-sm" onClick={() => { setArxivProxy(''); setProxyUrl(''); }}>清除</button>
+                )}
+              </div>
 
             </div>
           )}

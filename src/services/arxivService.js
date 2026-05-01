@@ -1,4 +1,23 @@
 import { translateToEnglish, translateToChinese } from './translateService'
+import { safeFetch } from './apiService'
+
+// ─── arXiv API proxy (for CORS bypass) ────────────────────────────────
+
+const PROXY_STORAGE_KEY = 'arxivProxyUrl'
+
+const getProxyUrl = () => {
+  try { return localStorage.getItem(PROXY_STORAGE_KEY) || '' }
+  catch { return '' }
+}
+
+export const setProxyUrl = (url) => {
+  try {
+    if (url) localStorage.setItem(PROXY_STORAGE_KEY, url)
+    else localStorage.removeItem(PROXY_STORAGE_KEY)
+  } catch {}
+}
+
+export const getConfiguredProxyUrl = () => getProxyUrl()
 
 const parseArxivXML = (xmlText) => {
   const parser = new DOMParser()
@@ -44,13 +63,43 @@ const parseArxivXML = (xmlText) => {
   })
 }
 
-const ARXIV_BASE = 'https://export.arxiv.org/api/query'
+const ARXIV_API = 'https://export.arxiv.org/api/query'
+const IS_ELECTRON = typeof window !== 'undefined' && window.electronAPI?.isElectron === true
+
+const buildArxivUrl = (query, maxResults) =>
+  `${ARXIV_API}?${query}&start=0&max_results=${maxResults}&sortBy=submittedDate&sortOrder=descending`
 
 export const fetchArxiv = async (query, maxResults = 10) => {
-  const url = `${ARXIV_BASE}?${query}&start=0&max_results=${maxResults}&sortBy=submittedDate&sortOrder=descending`
-  const res = await fetch(url, { signal: AbortSignal.timeout(20000) })
-  if (!res.ok) throw new Error(`arXiv API error: ${res.status}`)
-  return parseArxivXML(await res.text())
+  const directUrl = buildArxivUrl(query, maxResults)
+
+  // Electron: direct fetch via IPC proxy (no CORS issue)
+  if (IS_ELECTRON) {
+    const res = await safeFetch(directUrl, { timeout: 20000 })
+    if (!res.ok) throw new Error(`arXiv API error: ${res.status}`)
+    return parseArxivXML(await res.text())
+  }
+
+  // Web: try proxy first, then direct as fallback
+  const proxyUrl = getProxyUrl()
+  const urls = proxyUrl
+    ? [buildArxivUrl(query, maxResults).replace(ARXIV_API, proxyUrl), directUrl]
+    : [directUrl]
+
+  for (const url of urls) {
+    try {
+      const res = await safeFetch(url, { timeout: 20000 })
+      if (!res.ok) {
+        if (res.status >= 400 && res.status < 500) throw new Error(`arXiv API error: ${res.status}`)
+        continue
+      }
+      return parseArxivXML(await res.text())
+    } catch (err) {
+      if (err.message?.startsWith('arXiv API error:')) throw err
+      // Network error — try next URL
+    }
+  }
+
+  throw new Error('arXiv API unreachable')
 }
 
 // Translate titles and summaries of papers (batched to avoid API rate limiting)
