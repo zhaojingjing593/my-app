@@ -34,6 +34,23 @@ function createWindow() {
   }
 }
 
+// IPC: fetch proxy — allows renderer to make HTTP requests without CORS restrictions
+ipcMain.handle('fetch-proxy', async (_e, url, options = {}) => {
+  const { method = 'GET', headers = {}, body = null, timeout = 30000 } = options
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), timeout)
+  try {
+    const fetchOptions = { method, headers, signal: ctrl.signal }
+    if (body) fetchOptions.body = body
+    const res = await fetch(url, fetchOptions)
+    return { ok: res.ok, status: res.status, body: await res.text() }
+  } catch (err) {
+    return { ok: false, status: 0, body: err.message || 'Fetch failed' }
+  } finally {
+    clearTimeout(timer)
+  }
+})
+
 app.whenReady().then(() => {
   ipcMain.handle('store:get', (_e, key) => store.get(key))
   ipcMain.handle('store:set', (_e, key, value) => store.set(key, value))
