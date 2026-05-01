@@ -1,20 +1,16 @@
-// Cloudflare Worker - arXiv API Proxy
-// Deploy to Cloudflare Workers (free tier: 100k requests/day)
-// 1. Go to https://workers.cloudflare.com
-// 2. Create a new Worker
-// 3. Copy-paste this entire file
-// 4. Deploy and copy the worker URL (e.g. https://arxiv-proxy.yourname.workers.dev)
-// 5. Paste the URL in the arXiv Recommender settings page
+// Cloudflare Worker - arXiv API CORS Proxy
+// Deploy: npx wrangler deploy
+// Free tier: 100,000 requests/day
 
 export default {
   async fetch(request) {
     const url = new URL(request.url)
-    const query = url.searchParams.get('query')
-    if (!query) {
-      return new Response('Missing query parameter', { status: 400 })
+    const params = url.searchParams.toString()
+    if (!params) {
+      return new Response('Missing query parameters', { status: 400 })
     }
 
-    const arxivUrl = `https://export.arxiv.org/api/query?${query}&start=0&max_results=${url.searchParams.get('max_results') || '10'}&sortBy=submittedDate&sortOrder=descending`
+    const arxivUrl = `https://export.arxiv.org/api/query?${params}`
 
     const res = await fetch(arxivUrl, {
       headers: { 'User-Agent': 'arXiv-Recommender/1.0' },

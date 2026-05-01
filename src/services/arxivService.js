@@ -66,8 +66,21 @@ const parseArxivXML = (xmlText) => {
 const ARXIV_API = 'https://export.arxiv.org/api/query'
 const IS_ELECTRON = typeof window !== 'undefined' && window.electronAPI?.isElectron === true
 
+// Fallback CORS proxies (tried in order when user hasn't configured one)
+const DEFAULT_PROXIES = [
+  'https://api.codetabs.com/v1/proxy/?quest={url}',
+]
+
 const buildArxivUrl = (query, maxResults) =>
   `${ARXIV_API}?${query}&start=0&max_results=${maxResults}&sortBy=submittedDate&sortOrder=descending`
+
+const buildProxyUrl = (proxyTemplate, directUrl) => {
+  if (proxyTemplate.includes('{url}')) {
+    return proxyTemplate.replace('{url}', encodeURIComponent(directUrl))
+  }
+  // Direct base-URL replacement (Cloudflare Worker style)
+  return directUrl.replace(ARXIV_API, proxyTemplate)
+}
 
 export const fetchArxiv = async (query, maxResults = 10) => {
   const directUrl = buildArxivUrl(query, maxResults)
@@ -79,22 +92,29 @@ export const fetchArxiv = async (query, maxResults = 10) => {
     return parseArxivXML(await res.text())
   }
 
-  // Web: try proxy first, then direct as fallback
-  const proxyUrl = getProxyUrl()
-  const urls = proxyUrl
-    ? [buildArxivUrl(query, maxResults).replace(ARXIV_API, proxyUrl), directUrl]
-    : [directUrl]
+  // Web: collect proxy URLs (user-configured + defaults)
+  const userProxy = getProxyUrl()
+  const proxyTemplates = userProxy
+    ? [userProxy, ...DEFAULT_PROXIES]
+    : DEFAULT_PROXIES
+
+  const urls = [...proxyTemplates.map(t => buildProxyUrl(t, directUrl)), directUrl]
 
   for (const url of urls) {
     try {
       const res = await safeFetch(url, { timeout: 20000 })
       if (!res.ok) {
-        if (res.status >= 400 && res.status < 500) throw new Error(`arXiv API error: ${res.status}`)
+        // 4xx means bad request (bad proxy), try next
+        if (res.status >= 400 && res.status < 500) continue
+        // 5xx means server error on proxy's side, try next
         continue
       }
-      return parseArxivXML(await res.text())
-    } catch (err) {
-      if (err.message?.startsWith('arXiv API error:')) throw err
+      const text = await res.text()
+      // Validate XML response (some proxies return HTML error pages)
+      if (text.startsWith('<?xml') || text.startsWith('<feed')) {
+        return parseArxivXML(text)
+      }
+    } catch {
       // Network error — try next URL
     }
   }
