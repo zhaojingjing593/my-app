@@ -44,9 +44,7 @@ const parseArxivXML = (xmlText) => {
   })
 }
 
-const ARXIV_BASE = import.meta.env.VITE_IS_ELECTRON
-  ? 'https://export.arxiv.org/api/query'
-  : '/.netlify/functions/arxiv'
+const ARXIV_BASE = 'https://export.arxiv.org/api/query'
 
 export const fetchArxiv = async (query, maxResults = 10) => {
   const url = `${ARXIV_BASE}?${query}&start=0&max_results=${maxResults}&sortBy=submittedDate&sortOrder=descending`
