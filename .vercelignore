@@ -1,0 +1,13 @@
+node_modules
+node_modules/**
+dist
+electron
+build
+.DS_Store
+*.log
+.git
+.gitignore
+netlify
+netlify.toml
+scripts
+assets

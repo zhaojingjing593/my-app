@@ -173,10 +173,14 @@ export default function SearchPage() {
       addToHistory(trimmed)
     } catch (err) {
       if (token !== searchTokenRef.current) return
+      console.error('[search] Error:', err.message || err)
       if (err.message === 'NO_RESULTS') {
         setStatus('no-results')
       } else if (err.message === 'TRANSLATION_FAILED') {
-        setErrorMsg('中文关键词翻译失败，请尝试使用英文关键词搜索')
+        setErrorMsg('中文翻译失败，请尝试用英文关键词搜索，或在设置中配置 DeepSeek API Key')
+        setStatus('error')
+      } else if (err.message === 'arXiv API unreachable') {
+        setErrorMsg('无法连接 arXiv API，请检查网络或使用 VPN。提示：中国大陆用户可能无法直接访问 arxiv.org')
         setStatus('error')
       } else {
         setErrorMsg(err.message || '搜索失败，请检查网络后重试')
@@ -351,7 +355,14 @@ export default function SearchPage() {
         {status === 'no-results' && (
           <div className="no-results-area">
             <p>未找到与 &quot;{searchedKeyword}&quot; 相关的论文</p>
-            <p style={{ marginTop: 8, fontSize: '0.9rem' }}>请尝试其他关键词或检查拼写</p>
+            <p style={{ marginTop: 8, fontSize: '0.9rem' }}>
+              {/[一-鿿]/.test(searchedKeyword)
+                ? '建议：直接使用英文关键词搜索可获更准确的结果'
+                : '请尝试更换关键词或减少搜索词数量'}
+            </p>
+            <p style={{ marginTop: 4, fontSize: '0.8rem', opacity: 0.6 }}>
+              提示：打开开发者工具 (F12) 查看 Console 诊断信息
+            </p>
             <button className="chip" style={{ marginTop: 16 }} onClick={() => setStatus('idle')}>
               返回推荐
             </button>

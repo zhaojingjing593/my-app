@@ -10,6 +10,7 @@ import {
   getAllActiveCategoryLabels,
 } from '../services/recommendationService'
 import { setTranslationConfig } from '../services/translateService'
+import { safeFetch } from '../services/apiService'
 
 const PRESETS = [
   { color: '#E8D5F5', label: '浅紫' },
@@ -142,7 +143,7 @@ export default function SettingsPage({ onClose, onRefresh, onSearchHistoryClick 
     setTesting(true)
     setTestResult('')
     try {
-      const res = await fetch('https://api.deepseek.com/v1/models', {
+      const res = await safeFetch('https://api.deepseek.com/v1/models', {
         headers: { Authorization: `Bearer ${apiKey.trim()}` },
       })
       if (res.ok) {
