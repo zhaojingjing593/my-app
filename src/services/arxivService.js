@@ -286,16 +286,21 @@ export const searchArxiv = async (keyword, type = 'all', deepseekApiKey = '') =>
 
     let papers = []
 
-    // Strategy 1: exact author name
-    query = `search_query=au:"${cleanName}"`
-    papers = await fetchArxiv(query, 10)
+    // Strategy 1: exact author name (no quotes for proxy compatibility)
+    try {
+      const nameQuery = cleanName.replace(/\s+/g, '_')
+      query = `search_query=au:${encodeURIComponent(nameQuery)}`
+      papers = await fetchArxiv(query, 10)
+    } catch {}
 
     // Strategy 2: try last name only (if exact match returned nothing)
     if (papers.length === 0) {
       const lastName = cleanName.split(' ').filter(Boolean).pop()
       if (lastName && lastName.length > 2) {
-        query = `search_query=au:"${lastName}"`
-        papers = await fetchArxiv(query, 10)
+        try {
+          query = `search_query=au:${encodeURIComponent(lastName)}`
+          papers = await fetchArxiv(query, 10)
+        } catch {}
       }
     }
 
@@ -303,8 +308,10 @@ export const searchArxiv = async (keyword, type = 'all', deepseekApiKey = '') =>
     if (papers.length === 0) {
       const lastName = cleanName.split(' ').filter(Boolean).pop()
       if (lastName && lastName.length > 2) {
-        query = `search_query=all:${encodeURIComponent(lastName)}`
-        papers = await fetchArxiv(query, 5)
+        try {
+          query = `search_query=all:${encodeURIComponent(lastName)}`
+          papers = await fetchArxiv(query, 5)
+        } catch {}
       }
     }
 
@@ -327,23 +334,30 @@ export const searchArxiv = async (keyword, type = 'all', deepseekApiKey = '') =>
 
     let papers = []
 
-    // Strategy 1: exact phrase in title field
-    query = `search_query=ti:"${kw}"`
-    papers = await fetchArxiv(query, 10)
+    // Strategy 1: exact phrase in title field (no quotes for proxy compatibility)
+    try {
+      const titleQuery = kw.replace(/\s+/g, '_')
+      query = `search_query=ti:${encodeURIComponent(titleQuery)}`
+      papers = await fetchArxiv(query, 10)
+    } catch {}
 
     // Strategy 2: AND-join individual terms in title field
     if (papers.length === 0) {
       const terms = kw.split(/\s+/).filter(Boolean)
       if (terms.length > 1) {
-        query = `search_query=${terms.map(t => `ti:${encodeURIComponent(t)}`).join('+AND+')}`
-        papers = await fetchArxiv(query, 10)
+        try {
+          query = `search_query=${terms.map(t => `ti:${encodeURIComponent(t)}`).join('+AND+')}`
+          papers = await fetchArxiv(query, 10)
+        } catch {}
       }
     }
 
     // Strategy 3: fall back to all: field (broader match)
     if (papers.length === 0) {
-      query = `search_query=all:${encodeURIComponent(kw)}`
-      papers = await fetchArxiv(query, 10)
+      try {
+        query = `search_query=all:${encodeURIComponent(kw)}`
+        papers = await fetchArxiv(query, 10)
+      } catch {}
     }
 
     if (papers.length === 0) throw new Error('NO_RESULTS')
